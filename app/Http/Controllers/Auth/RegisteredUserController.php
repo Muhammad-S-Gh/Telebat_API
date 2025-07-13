@@ -26,7 +26,6 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed', Rules\Password::defaults()],
             'phone_number' => ['required', 'string', 'unique:' . Phone::class],
             'profile_picture' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
-            'fcm_token' => ['nullable', 'string'],
             'role' => ['nullable', Rule::in(['vendor', 'user'])],
         ]);
 
@@ -40,12 +39,12 @@ class RegisteredUserController extends Controller
         $role = $validated['role'] ?? 'user';
         $user->assignRole($role);
 
+        $user->phone()->create(['phone_number' => $request->phone_number]);
+        $update_email = false;
+
         if ($request->hasFile('profile_picture')) {
             $user->storeProfilePicture($request->file('profile_picture'));
         }
-
-        $user->phone()->create(['phone_number' => $request->phone_number]);
-        $update_email = false;
 
         event(new Registered($user, $update_email)); // automatically invoke the $user->sendEmailVerificationNotification
 

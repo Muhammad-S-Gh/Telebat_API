@@ -4,15 +4,10 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Phone;
-use App\Models\User;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
-use Inertia\Inertia;
-use Inertia\Response;
+
 
 class AuthenticatedSessionController extends Controller
 {
@@ -22,6 +17,7 @@ class AuthenticatedSessionController extends Controller
         $request->validate([
             'phone_number' => 'required|string',
             'password' => 'required|string',
+            'fcm_token' => 'required|string'
         ]);
 
         $phone = Phone::where('phone_number', $request->phone_number)->first();

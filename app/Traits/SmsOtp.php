@@ -9,8 +9,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-use function Pest\Laravel\json;
-
 trait SmsOtp
 {
     protected int $minutes = 60;
