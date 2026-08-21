@@ -4,6 +4,7 @@ namespace App\Repositories\Eloquent;
 
 use App\Models\Order;
 use App\Models\PaymentRequest;
+use App\Models\User;
 use App\Repositories\Contracts\PaymentRequestRepositoryInterface;
 
 class EloquentPaymentRequestRepository implements PaymentRequestRepositoryInterface
@@ -26,5 +27,13 @@ class EloquentPaymentRequestRepository implements PaymentRequestRepositoryInterf
     public function deleteForOrder(Order $order): void
     {
         $order->paymentRequest()->delete();
+    }
+
+    public function findPendingForUser(int $id, User $user): PaymentRequest
+    {
+        return PaymentRequest::whereKey($id)
+            ->where('user_id', $user->id)
+            ->where('status', PaymentRequest::status()->pending)
+            ->firstOrFail();
     }
 }

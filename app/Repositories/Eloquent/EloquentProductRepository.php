@@ -10,6 +10,13 @@ use Illuminate\Database\Eloquent\Collection;
 
 class EloquentProductRepository implements ProductRepositoryInterface
 {
+    public function latestForHome(int $userId, int $limit): Collection
+    {
+        return Product::withCount([
+            'favoriteBy as is_favorite' => fn ($query) => $query->where('user_id', $userId),
+        ])->latest()->take($limit)->get();
+    }
+
     public function findOrFail(int $id): Product
     {
         return Product::findOrFail($id);

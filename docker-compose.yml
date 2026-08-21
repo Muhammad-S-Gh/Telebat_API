@@ -2,7 +2,7 @@ services:
     app:
         build:
             context: ./docker/php
-        user: ${UID}:${GID}
+        user: ${UID:-1000}:${GID:-1000}
         volumes:
             - .:/var/www
         depends_on:
@@ -16,7 +16,7 @@ services:
         restart: unless-stopped
 
     nginx:
-        image: nginx:${NGINX_VERSION}
+        image: nginx:${NGINX_VERSION:-1.27-alpine}
         ports:
             - '8000:80'
         volumes:
@@ -27,22 +27,22 @@ services:
         restart: unless-stopped
 
     db:
-        image: mysql:${MYSQL_VERSION}
+        image: mysql:${MYSQL_VERSION:-8.0}
         healthcheck:
             test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
             timeout: 20s
             retries: 10
         restart: unless-stopped
         environment:
-            MYSQL_DATABASE: ${MYSQL_DATABASE}
-            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+            MYSQL_DATABASE: ${MYSQL_DATABASE:-telebat}
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local-root-password}
         ports:
             - '3306:3306'
         volumes:
             - db_data:/var/lib/mysql
 
     redis:
-        image: redis:${REDIS_VERSION}
+        image: redis:${REDIS_VERSION:-7-alpine}
         restart: unless-stopped
         ports:
             - '6379:6379'
@@ -55,7 +55,7 @@ services:
         build:
             context: ./docker/php
         volumes:
-            - ./backend:/var/www
+            - .:/var/www
         command: supercronic /etc/supercronic/crontab
         depends_on:
             - app

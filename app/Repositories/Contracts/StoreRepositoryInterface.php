@@ -12,6 +12,8 @@ interface StoreRepositoryInterface
 
     public function paginate(array $filters, string $locale, int $perPage): LengthAwarePaginator;
 
+    public function latest(int $limit): Collection;
+
     public function create(array $attributes): Store;
 
     public function save(Store $store): Store;

@@ -24,6 +24,11 @@ class EloquentSectionRepository implements SectionRepositoryInterface
             ->paginate($perPage);
     }
 
+    public function latest(int $limit): \Illuminate\Database\Eloquent\Collection
+    {
+        return Section::latest()->take($limit)->get();
+    }
+
     public function create(array $attributes): Section
     {
         return Section::create($attributes);

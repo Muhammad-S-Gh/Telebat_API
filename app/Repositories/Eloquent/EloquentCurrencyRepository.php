@@ -12,4 +12,9 @@ class EloquentCurrencyRepository implements CurrencyRepositoryInterface
     {
         return Currency::all();
     }
+
+    public function findActive(int $id): Currency
+    {
+        return Currency::where('active', true)->findOrFail($id);
+    }
 }

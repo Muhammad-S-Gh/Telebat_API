@@ -31,6 +31,11 @@ class EloquentStoreRepository implements StoreRepositoryInterface
             ->paginate($perPage);
     }
 
+    public function latest(int $limit): Collection
+    {
+        return Store::latest()->take($limit)->get();
+    }
+
     public function create(array $attributes): Store
     {
         return Store::create($attributes);

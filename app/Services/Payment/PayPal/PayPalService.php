@@ -5,10 +5,12 @@ namespace App\Services\Payment\PayPal;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\PaymentRequest;
+use App\Models\User;
 use App\Notifications\OrderStatusUpdated;
 use App\Notifications\ShipOrderNotification;
+use App\Repositories\Contracts\CurrencyRepositoryInterface;
+use App\Repositories\Contracts\PaymentRequestRepositoryInterface;
 use App\Services\Payment\PaymentService;
-use Exception;
 use Illuminate\Support\Facades\DB;
 use PayPalCheckoutSdk\Core\PayPalHttpClient;
 use PayPalCheckoutSdk\Core\ProductionEnvironment;
@@ -17,18 +19,66 @@ use PayPalCheckoutSdk\Orders\OrdersCaptureRequest;
 use PayPalCheckoutSdk\Orders\OrdersCreateRequest;
 use PayPalCheckoutSdk\Orders\OrdersGetRequest;
 
-use function Laravel\Prompts\error;
 
 class PayPalService extends PaymentService
 {
     private PayPalHttpClient $client;
-    public function __construct()
-    {
+
+    public function __construct(
+        private readonly PaymentRequestRepositoryInterface $paymentRequests,
+        private readonly CurrencyRepositoryInterface $currencies,
+    ) {
         $environment = config('services.paypal.mode') === 'live'
             ? new ProductionEnvironment(config('services.paypal.client_id'), config('services.paypal.client_secret'))
             : new SandboxEnvironment(config('services.paypal.client_id'), config('services.paypal.client_secret'));
 
         $this->client = new PayPalHttpClient($environment);
+    }
+
+    public function checkout(User $user, int $paymentRequestId, int $currencyId): array
+    {
+        $paymentRequest = $this->paymentRequests->findPendingForUser($paymentRequestId, $user);
+        $currency = $this->currencies->findActive($currencyId);
+
+        $description = $paymentRequest->description;
+        if (is_array($description)) {
+            $description = $description[app()->getLocale()] ?? reset($description) ?: '';
+        }
+        $paypalOrderData = $this->createOrder($paymentRequest->price, $currency->code, (string) $description);
+
+        $user->payments()->create([
+            'model_type' => PaymentRequest::class,
+            'model_id' => $paymentRequest->id,
+            'payment_request_id' => $paymentRequest->id,
+            'payment_method' => Payment::methods()->paypal,
+            'status' => Payment::status()->pending,
+            'paypal_order_id' => $paypalOrderData['paypal_order_id'],
+            'price' => $paymentRequest->price,
+            'currency' => strtolower($currency->code),
+        ]);
+
+        return $paypalOrderData;
+    }
+
+    public function cancel(string $orderId): void
+    {
+        DB::transaction(function () use ($orderId) {
+            $payment = Payment::where('paypal_order_id', $orderId)
+                ->where('status', Payment::status()->pending)
+                ->lockForUpdate()
+                ->first();
+            if (! $payment) {
+                return;
+            }
+
+            $paymentRequest = $payment->paymentRequest;
+            $payment->update(['status' => Payment::status()->canceled]);
+            $paymentRequest?->update(['status' => PaymentRequest::status()->canceled]);
+
+            if ($paymentRequest?->payable_type === Order::class) {
+                Order::whereKey($paymentRequest->payable_id)->where('status', 'pending')->update(['status' => 'canceled']);
+            }
+        });
     }
 
     public function createOrder(float $total, string $currency, string $description)
@@ -96,13 +146,7 @@ class PayPalService extends PaymentService
                 $amountPaidInCents = (int)round(($amountPaid) * 100);
 
                 if ((string)$totalInCents !== (string)$amountPaidInCents) {
-                    return error(
-                        __("messages.total_not_equal_paid"),
-                        [
-                            __("messages.total_not_equal_paid")
-                        ],
-                        400
-                    );
+                    throw new \RuntimeException(__("messages.total_not_equal_paid"), 400);
                 }
 
                 $request = new OrdersCaptureRequest($orderId);
@@ -114,9 +158,7 @@ class PayPalService extends PaymentService
                     $captureDetails = $response->result->purchase_units[0]->payments->captures[0] ?? null;
 
                     $payment->update([
-                        'payment_id' => $captureDetails->id ?? null,
-                        'paypal_payer_email' => $response->result->payer->email_address,
-                        'paypal_payer_id' => $response->result->payer->payer_id,
+                        'paypal_capture_response' => json_encode($captureDetails),
                         'currency' => $orderDetails->purchase_units[0]->amount->currency_code,
                         'status' => $response->result->status,
                         'description' => $response->result->purchase_units[0]->description ?? null,
@@ -141,22 +183,10 @@ class PayPalService extends PaymentService
                     ]);
                 }
 
-                if ($response->result->status !== 'COMPLETED') {
-                    return error(__('messages.payment_not_approved'), [
-                        __('messages.payment_not_approved')
-                    ], 400);
-                }
-
-
-                throw new \Exception(__("messages.payment_not_approved"));
-                return error(__('messages.payment_not_approved'), [
-                    __('messages.payment_not_approved')
-                ], 400);
+                throw new \RuntimeException(__('messages.payment_not_approved'), 400);
             });
         } catch (\Exception $e) {
-            return error($e->getMessage(), [
-                $e->getMessage(),
-            ], 500);
+            return error($e->getMessage(), $e->getCode() >= 400 && $e->getCode() < 600 ? $e->getCode() : 500);
         }
     }
 

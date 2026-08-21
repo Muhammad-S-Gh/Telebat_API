@@ -534,5 +534,3 @@ Telebat API is open-sourced under the **MIT License** as declared by the project
 GitHub: [@Muhammad-S-Gh](https://github.com/Muhammad-S-Gh)
 
 ---
-
-<p align="center">Backend-focused Laravel e-commerce API built with ❤️</p>

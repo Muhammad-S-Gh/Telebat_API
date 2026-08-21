@@ -17,6 +17,6 @@ class StripeController extends Controller
 
     public function handleWebhook(Request $request)
     {
-        return success($this->stripeService->handleWebhook($request));
+        return $this->stripeService->handleWebhook($request);
     }
 }

@@ -36,6 +36,13 @@ class OrderService
         return $this->orders->forUser($user);
     }
 
+    public function showForUser(Order $order, User $user): Order
+    {
+        abort_unless($order->user_id === $user->id, 403);
+
+        return $this->orders->loadProductsAndPaymentRequest($order);
+    }
+
     public function createFromCart(User $user): ServiceResult
     {
         return DB::transaction(function () use ($user) {
@@ -44,6 +51,13 @@ class OrderService
 
             if ($cart->products->isEmpty()) {
                 return ServiceResult::failure('Your cart is empty', 422);
+            }
+
+            // Check the entire cart before creating an order or reserving stock.
+            foreach ($cart->products as $product) {
+                if ($product->pivot->quantity > $product->quantity) {
+                    return ServiceResult::failure("Not enough stock for product: {$product->getName($locale)}", 400);
+                }
             }
 
             $total = $this->total($cart->products);
@@ -56,10 +70,6 @@ class OrderService
 
             foreach ($cart->products as $product) {
                 $quantity = $product->pivot->quantity;
-
-                if ($quantity > $product->quantity) {
-                    return ServiceResult::failure("Not enough stock for product: {$product->getName($locale)}", 400);
-                }
 
                 $this->orders->attachProduct($order, $product, $quantity, $product->price);
                 $this->products->decrementQuantity($product, $quantity);

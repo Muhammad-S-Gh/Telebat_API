@@ -1,11 +1,15 @@
 {
   "$schema": "https://getcomposer.org/schema.json",
-  "name": "laravel/vue-starter-kit",
+  "name": "muhammad-s-gh/telebat-api",
   "type": "project",
-  "description": "The skeleton application for the Laravel framework.",
+  "description": "Laravel backend API for the Telebat multi-vendor e-commerce platform.",
   "keywords": [
+    "telebat",
     "laravel",
-    "framework"
+    "api",
+    "backend",
+    "e-commerce",
+    "multi-vendor"
   ],
   "license": "MIT",
   "require": {
@@ -71,7 +75,6 @@
     ],
     "post-create-project-cmd": [
       "@php artisan key:generate --ansi",
-      "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
       "@php artisan migrate --graceful --ansi"
     ],
     "dev": [

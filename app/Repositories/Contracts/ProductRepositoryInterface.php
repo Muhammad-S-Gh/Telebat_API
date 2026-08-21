@@ -11,6 +11,8 @@ interface ProductRepositoryInterface
 {
     public function findOrFail(int $id): Product;
 
+    public function latestForHome(int $userId, int $limit): Collection;
+
     public function paginateForCatalog(array $filters, int $userId, string $locale, int $perPage): LengthAwarePaginator;
 
     public function create(array $attributes): Product;

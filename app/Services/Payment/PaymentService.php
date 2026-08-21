@@ -10,7 +10,7 @@ use Stripe\PaymentIntent;
 
 class PaymentService
 {
-    protected function savePayment(User|Authenticatable &$user, PaymentIntent $paymentIntent, string $status = null, PaymentRequest $pr): void
+    protected function savePayment(User|Authenticatable $user, PaymentIntent $paymentIntent, PaymentRequest $pr, string $currencyCode, ?string $status = null): void
     {
         Payment::create([
             'user_id' => $user->id,
@@ -20,7 +20,8 @@ class PaymentService
             'model_type' => get_class($pr),
             'status' => $status ?? Payment::status()->pending,
             'payment_method' => $paymentIntent->payment_method_types[0],
-            'price' => $pr->price
+            'price' => $pr->price,
+            'currency' => strtolower($currencyCode)
         ]);
     }
 

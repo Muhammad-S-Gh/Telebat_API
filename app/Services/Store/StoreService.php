@@ -43,8 +43,9 @@ class StoreService
         ];
     }
 
-    public function update(Store $store, array $data, ?UploadedFile $image): array
+    public function update(Store $store, array $data, User $user, ?UploadedFile $image): array
     {
+        Gate::denyIf($store->vendor_id !== $user->id, 'Unauthorized action');
         if ($image) {
             $this->deleteImage($store->image);
             $store->image = $image->store('stores', 'public');

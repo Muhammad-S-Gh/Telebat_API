@@ -11,7 +11,7 @@ use App\Notifications\OrderStatusUpdated;
 use App\Notifications\ShipOrderNotification;
 use App\Services\Payment\PaymentService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Stripe\Stripe;
 use Stripe\StripeClient;
@@ -58,7 +58,7 @@ class StripeService extends PaymentService
                     'idempotency_key' => "payment_intent_{$paymentRequest->id}_{$user->id}",
                 ]
             );
-            $this->savePayment($user, $paymentIntent, Payment::status()->pending, $paymentRequest);
+            $this->savePayment($user, $paymentIntent, $paymentRequest, $this->currencyCode, Payment::status()->pending);
 
             return [
                 'clientSecret' => $paymentIntent->client_secret,
@@ -84,9 +84,9 @@ class StripeService extends PaymentService
                 $this->endpointSecret,
             );
         } catch (\UnexpectedValueException $e) {
-            return ['error' => 'invalid payload', 400];
+            return response()->json(['error' => 'invalid payload'], 400);
         } catch (SignatureVerificationException $e) {
-            return ['error' => 'Invalid signature', 400];
+            return response()->json(['error' => 'Invalid signature'], 400);
         }
 
         if ($event['type'] === 'payment_intent.succeeded') {
@@ -104,28 +104,33 @@ class StripeService extends PaymentService
                 $amount != $expectedCents
                 || strtolower($currency) != strtolower($payment->currency)
             ) {
-                ['error' => "Discrepancy for intent $clientSecret", 400];
+                return response()->json(['error' => "Discrepancy for intent $clientSecret"], 400);
             }
 
 
-            $pr = $payment->paymentRequest;
-
-            $payment->update(['status' => Payment::status()->completed]);
-            $pr->update(['status' => PaymentRequest::status()->completed]);
-
-            if ($pr->payable_type === Order::class) {
-                $order = Order::find($pr->payable_id);
-                $order->update(['status' => 'approved']);
-
-                $user = $order->user;
-                if ($user) {
-                    $user->notify(new OrderStatusUpdated($order, $order->status));
+            DB::transaction(function () use ($payment): void {
+                $payment = Payment::whereKey($payment->id)->lockForUpdate()->firstOrFail();
+                if ($payment->status === Payment::status()->completed) {
+                    return;
                 }
-                $vendor = $order->store()->first()->vendor;
-                if ($vendor) {
-                    $vendor->notify(new ShipOrderNotification($order));
+
+                $pr = $payment->paymentRequest;
+                $payment->update(['status' => Payment::status()->completed]);
+                $pr->update(['status' => PaymentRequest::status()->completed]);
+
+                if ($pr->payable_type === Order::class) {
+                    $order = Order::findOrFail($pr->payable_id);
+                    $order->update(['status' => 'approved']);
+
+                    if ($order->user) {
+                        $order->user->notify(new OrderStatusUpdated($order, $order->status));
+                    }
+                    $vendor = $order->store()->first()?->vendor;
+                    if ($vendor) {
+                        $vendor->notify(new ShipOrderNotification($order));
+                    }
                 }
-            }
+            });
 
             return ['status' => 'success'];
         }

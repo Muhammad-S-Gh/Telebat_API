@@ -21,9 +21,9 @@ class AuthenticatedSessionController extends Controller
         ]);
 
         $phone = Phone::where('phone_number', $request->phone_number)->first();
-        $user = $phone->user;
+        $user = $phone?->user;
 
-        if (!$phone || !$user || !Hash::check($request->password, $user->password)) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
                 'phone_number' => 'The provided credentials are incorrect'
             ]);
